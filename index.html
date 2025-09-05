@@ -1,0 +1,2271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正十二面体</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        /* 基础样式 */
+        * { box-sizing: border-box; }
+        
+        body {
+            margin: 0; padding: 0; background: #000; color: #fff;
+            font-family: Arial, sans-serif; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; min-height: 100vh; overflow-x: hidden;
+        }
+        
+        .model-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            flex: 1; width: 100%; max-width: 1200px; padding: 20px;
+        }
+        
+        h1 { margin-bottom: 20px; }
+        
+        canvas {
+            border: 1px solid #444; margin: 20px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            max-width: 90vw; max-height: 60vh; cursor: grab;
+        }
+        
+        .info { max-width: 600px; text-align: center; margin: 20px; }
+        
+        /* 通用按钮样式 */
+        .control-button {
+            padding: 12px 20px; font-size: 16px;
+            background: rgba(76, 175, 80, 0.2); border: 1px solid rgba(76, 175, 80, 0.5);
+            border-radius: 16px; color: white; cursor: pointer;
+            transition: all 0.3s ease; min-width: 120px; height: 44px;
+            display: flex; align-items: center; justify-content: center; text-align: center;
+        }
+        
+        .control-button:hover {
+            background: rgba(76, 175, 80, 0.4); transform: translateY(-1px);
+        }
+        
+        .control-button:active { transform: scale(0.95); }
+        
+        /* 控制区域样式 */
+        #controls {
+            margin-top: 20px; display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px; padding: 0 10px; max-width: 800px; margin: 0 auto;
+        }
+        
+        .control-group {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 10px; padding: 15px;
+            background: rgba(255, 255, 255, 0.05); border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .buttons-container {
+            display: flex; flex-wrap: wrap; gap: 15px;
+            justify-content: center; margin: 20px 0; padding: 0 20px;
+        }
+        
+        /* 滑块统一样式 */
+        input[type="range"] {
+            -webkit-appearance: none; appearance: none; height: 8px;
+            border-radius: 4px; background: rgba(255, 255, 255, 0.2);
+            outline: none; margin: 10px 0; width: 100%; cursor: pointer;
+            touch-action: pan-x;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 20px; height: 20px;
+            background: #4CAF50; border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.5); cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 20px; height: 20px; background: #4CAF50; border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.5); cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+        
+        .slider-container {
+            display: flex; align-items: center; gap: 15px; width: 100%;
+        }
+        
+        .slider-container input[type="range"] { flex: 1; width: 100%; }
+        
+        .value-display {
+            min-width: 45px; text-align: right; font-weight: bold;
+            font-size: 14px; color: #4CAF50;
+        }
+        
+        /* 骰子模式样式 */
+        .dice-mode .control-button {
+            background: rgba(76, 175, 80, 0.3); border: 1px solid rgba(76, 175, 80, 0.7);
+        }
+        
+        .dice-mode .control-button:hover {
+            background: rgba(76, 175, 80, 0.5);
+        }
+        
+        .dice-mode .control-button:active {
+            transform: scale(0.95); background: rgba(76, 175, 80, 0.4);
+            transition: transform 0.1s ease, background 0.1s ease;
+        }
+        
+        .dice-mode .buttons-container {
+            flex-direction: row; align-items: center; justify-content: center;
+            flex-wrap: wrap; gap: 12px; width: 100%; max-width: 600px; margin: 0 auto;
+        }
+        
+        .dice-mode .buttons-container > *,
+        .dice-mode #rollDiceContainer {
+            display: flex !important; align-items: center; justify-content: center;
+        }
+        
+        #rollDiceContainer {
+            display: flex; gap: 12px; align-items: center;
+            justify-content: center; width: 100%; margin-top: 10px;
+        }
+        
+        /* 控制面板样式 */
+        .control-panel {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 90%; max-width: 500px;
+            max-height: 80vh; z-index: 10000;
+            background: rgba(0, 0, 0, 0.95); backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px); border-radius: 20px; padding: 20px;
+            box-shadow: 0 10px 60px rgba(0, 0, 0, 0.7);
+            transition: all 0.3s ease; border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+            -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+            -webkit-user-select: none; -moz-user-select: none;
+            -ms-user-select: none; user-select: none;
+            will-change: scroll-position;
+        }
+        
+        .control-panel .control-group {
+            background: transparent; border: none; margin-bottom: 15px; padding: 0;
+        }
+        
+        .control-panel::-webkit-scrollbar { width: 8px; }
+        .control-panel::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1); border-radius: 10px;
+        }
+        .control-panel::-webkit-scrollbar-thumb {
+            background: #4CAF50; border-radius: 10px;
+        }
+        .control-panel::-webkit-scrollbar-thumb:hover { background: #5cb85c; }
+        
+        /* Toggle开关样式 */
+        .toggle-container {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; position: relative; margin: 10px 0;
+        }
+        
+        .toggle-checkbox { display: none; }
+        
+        .toggle-label {
+            position: relative; display: inline-block; width: 60px; height: 30px;
+            background-color: #666; border-radius: 15px; cursor: pointer;
+            transition: all 0.3s ease; z-index: 1;
+        }
+        
+        .toggle-label::before {
+            content: ''; position: absolute; top: 2px; left: 2px;
+            width: 26px; height: 26px; background-color: white; border-radius: 50%;
+            transition: transform 0.3s; box-shadow: 0 0 2px rgba(0,0,0,0.2); z-index: 2;
+        }
+        
+        .toggle-label::after {
+            content: 'OFF'; position: absolute; right: 8px; top: 50%;
+            transform: translateY(-50%); color: #fff; font-size: 12px; font-weight: bold;
+        }
+        
+        .toggle-checkbox:checked + .toggle-label { background-color: #4CAF50; }
+        .toggle-checkbox:checked + .toggle-label::before { transform: translateX(30px); }
+        .toggle-checkbox:checked + .toggle-label::after {
+            content: 'ON'; left: 8px; right: auto;
+        }
+        
+        /* 控制面板头部 */
+        .control-panel-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 20px;
+        }
+        
+        .control-panel-title {
+            font-size: 20px; font-weight: bold; margin: 0;
+        }
+        
+        .close-panel {
+            background: none; border: none; color: white; font-size: 24px;
+            cursor: pointer; padding: 0; width: 30px; height: 30px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        
+        /* 遮罩层 */
+        .controls-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); z-index: 999; display: none;
+            touch-action: none;
+        }
+        
+        .controls-visible .control-panel,
+        .controls-visible .controls-overlay { display: block; }
+        
+        /* 其他元素样式 */
+        .loader {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 40px; height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #4CAF50; border-radius: 50%;
+            animation: spin 1s linear infinite; display: none;
+        }
+        
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+        
+        .shortcut-hint {
+            position: absolute; bottom: 20px; right: 20px;
+            font-size: 12px; opacity: 0.7;
+        }
+        
+        .mobile-hint {
+            position: relative; margin: 10px auto; font-size: 12px;
+            opacity: 0.7; line-height: 1.4; text-align: center;
+            display: none; max-width: 300px; padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3); border-radius: 8px;
+            -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
+        }
+        
+        /* 响应式设计 - 统一处理 */
+        @media (max-width: 768px) {
+            .shortcut-hint { display: none; }
+            .mobile-hint { display: block; }
+            
+            h1 { font-size: 1.3em; }
+            .info { font-size: 0.8em; margin: 8px; }
+            #controls {
+                margin-top: 15px; padding: 0 10px;
+                grid-template-columns: 1fr; gap: 12px; max-width: 500px;
+            }
+            .control-group { gap: 10px; max-width: 100%; padding: 12px; }
+            label { font-size: 16px; margin-bottom: 8px; }
+            
+            input[type="range"] {
+                height: 20px; border-radius: 10px;
+                background: rgba(255, 255, 255, 0.1); padding: 0; margin: 0;
+            }
+            
+            input[type="range"]::-webkit-slider-thumb,
+            input[type="range"]::-moz-range-thumb {
+                width: 30px; height: 30px; margin-top: -5px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            }
+            
+            .value-display { font-size: 16px; }
+            
+            #rollDiceContainer { display: none !important; }
+            .dice-mode #rollDiceContainer { display: block !important; }
+            .dice-mode .controls-toggle { display: block !important; }
+            
+            .control-panel {
+                width: 90%; max-width: 400px; height: auto; max-height: 85vh;
+                border-radius: 16px; margin: 0; will-change: transform;
+            }
+            
+            .control-group { padding: 10px; margin: 4px 0; }
+            .slider-container {
+                flex-direction: column; align-items: stretch; gap: 4px;
+                position: relative; padding: 6px 0;
+            }
+            .value-display {
+                min-width: 35px; font-size: 13px; align-self: flex-end;
+            }
+            input[type="range"] {
+                width: 100%; margin: 2px 0; height: 44px; cursor: pointer;
+                transition: transform 0.1s ease;
+            }
+            input[type="range"]:active,
+            input[type="range"].dragging { transform: scale(1.02); }
+            input[type="range"]::-webkit-slider-thumb:active,
+            input[type="range"]::-moz-range-thumb:active {
+                transform: scale(1.2); box-shadow: 0 0 15px rgba(74, 144, 226, 0.5);
+            }
+            input[type="range"]::-webkit-slider-thumb,
+            input[type="range"]::-moz-range-thumb {
+                height: 28px; width: 28px;
+            }
+            .control-panel * {
+                -webkit-user-select: none; -moz-user-select: none;
+                -ms-user-select: none; user-select: none;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 { font-size: 1.1em; }
+            canvas { margin: 5px; }
+            .info { font-size: 0.7em; margin: 5px; }
+            .mobile-hint {
+                font-size: 11px; margin: 8px auto; padding: 6px 10px; max-width: 280px;
+            }
+            
+            .buttons-container,
+            .dice-mode .buttons-container {
+                flex-direction: column; align-items: center; gap: 8px;
+                padding: 0 15px; width: 100%; max-width: 100%;
+            }
+            
+            .control-button,
+            .dice-mode .control-button,
+            .dice-mode #rollDiceContainer .control-button {
+                width: 90%; max-width: 200px; min-height: 40px; height: 40px;
+                font-size: 14px; padding: 8px 12px; margin: 0; box-sizing: border-box;
+            }
+            
+            .dice-mode .buttons-container {
+                flex-direction: column; align-items: center; gap: 6px;
+                padding: 0 10px; width: 100%;
+            }
+            
+            .dice-mode .buttons-container > *,
+            .dice-mode #rollDiceContainer {
+                width: 90%; max-width: 200px; margin: 0; padding: 0;
+                display: flex !important; align-items: center; justify-content: center;
+            }
+            
+            .dice-mode .control-button,
+            .dice-mode #rollDiceContainer .control-button {
+                width: 100%; max-width: none; min-height: 40px; height: 40px;
+                font-size: 14px; padding: 8px 12px; margin: 0; box-sizing: border-box;
+            }
+            
+            .dice-mode #rollDiceContainer {
+                background: none; border: none; box-shadow: none;
+                margin-top: 0;
+            }
+        }
+        
+        @media (max-width: 375px) {
+            .control-panel { padding: 12px; }
+            .control-group { padding: 8px; margin: 2px 0; }
+            .slider-container { gap: 3px; padding: 4px 0; }
+            
+            .control-button,
+            .dice-mode .control-button {
+                width: 85%; max-width: 180px; min-height: 38px; height: 38px;
+                font-size: 13px; padding: 6px 10px;
+            }
+            
+            .dice-mode .buttons-container > *,
+            .dice-mode #rollDiceContainer {
+                width: 85%; max-width: 180px;
+                display: flex !important; align-items: center; justify-content: center;
+            }
+            
+            .dice-mode .control-button,
+            .dice-mode #rollDiceContainer .control-button {
+                min-height: 38px; height: 38px; font-size: 13px; padding: 6px 10px;
+            }
+            
+            .dice-mode #rollDiceContainer {
+                margin-top: 0;
+            }
+        }
+        
+        /* 隐藏规则 */
+        #controls :not(.control-button):not(#rollDiceContainer):not(.buttons-container),
+        .dice-mode #controls :not(.control-button):not(#rollDiceContainer):not(.control-panel .control-group):not(.buttons-container) {
+            display: none;
+        }
+    </style>
+    </style>
+</head>
+<body>
+    <div class="loader" id="loader"></div>
+    <div class="model-container">
+        <h1>正十二面体</h1>
+        <canvas id="dodecahedronCanvas" width="800" height="600"></canvas>
+        <div class="info" id="infoSection">
+            <p>正十二面体是一种柏拉图立体，具有12个面、20个顶点和30条边。</p>
+            <p>每个面都是正五边形。</p>
+        </div>
+        <div class="mobile-hint">👇 单指点击：暂停/播放旋转<br>👆️ 点按拖动：调整模型角度<br>🤏 双指捏合：调整模型大小<br>👌 三指点击：重置模型位置</div>
+        
+        <div id="controls">
+            <div class="buttons-container">
+                <button id="diceModeButton" class="control-button">骰子模式</button>
+                <div id="rollDiceContainer" style="display: none;">
+                    <button id="rollDiceButton" class="control-button">掷骰子</button>
+                </div>
+                <button class="control-button" id="controlsToggle">显示控制面板</button>
+            </div>
+        </div>
+        
+        <!-- 重构后的控制面板 -->
+        <div class="control-panel" id="controlPanel">
+            <div class="control-panel-header">
+                <h2 class="control-panel-title">控制面板</h2>
+                <button class="close-panel" id="closePanel">&times;</button>
+            </div>
+            <div class="control-group">
+                <label for="rotationSpeedModal">模型旋转速度:</label>
+                <div class="slider-container">
+                    <input type="range" id="rotationSpeedModal" min="0" max="100" value="50">
+                    <span class="value-display" id="speedValueModal">50</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="modelSizeModal">模型大小:</label>
+                <div class="slider-container">
+                    <input type="range" id="modelSizeModal" min="50" max="200" value="100">
+                    <span class="value-display" id="sizeValueModal">100</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="colorIntensityModal">面颜色明艳度:</label>
+                <div class="slider-container">
+                    <input type="range" id="colorIntensityModal" min="0" max="100" value="70">
+                    <span class="value-display" id="colorValueModal">70</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="faceOpacityModal">面透明度:</label>
+                <div class="slider-container">
+                    <input type="range" id="faceOpacityModal" min="0" max="100" value="70">
+                    <span class="value-display" id="opacityValueModal">70</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="fontSizeModal">面数字大小:</label>
+                <div class="slider-container">
+                    <input type="range" id="fontSizeModal" min="0" max="120" value="50">
+                    <span class="value-display" id="fontSizeValueModal">50</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="panelOpacityModal">面板透明度:</label>
+                <div class="slider-container">
+                    <input type="range" id="panelOpacityModal" min="0" max="100" value="95">
+                    <span class="value-display" id="panelOpacityValueModal">95</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="blurToggle">面板毛玻璃特效:</label>
+                <div class="toggle-container">
+                    <input type="checkbox" id="blurToggle" class="toggle-checkbox" checked>
+                    <label for="blurToggle" class="toggle-label">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+        </div>
+        
+        <!-- 控制面板遮罩层 -->
+        <div class="controls-overlay" id="controlsOverlay"></div>
+        
+        <div class="shortcut-hint">空格键：暂停/播放旋转<br>R键：重置模型位置</div>
+    </div>
+
+    <script>
+        // 数学常量
+        const { cos, sin, acos, atan, sqrt, PI } = Math;
+        const TAU = 2 * PI; // 2π，完整的圆周角
+        
+        // 配置常量
+        const CONFIG = {
+            GOLDEN_RATIO: (1 + Math.sqrt(5)) / 2,
+            ROTATION_SPEED_FACTOR: 0.03,
+            MIN_ROTATION_SPEED: 0.001, MAX_ROTATION_SPEED: 0.1,
+            MIN_MODEL_SIZE: 50, MAX_MODEL_SIZE: 200, DEFAULT_MODEL_SIZE: 100,
+            MIN_COLOR_INTENSITY: 50, MAX_COLOR_INTENSITY: 100, DEFAULT_COLOR_INTENSITY: 70,
+            MIN_FACE_OPACITY: 0, MAX_FACE_OPACITY: 100, DEFAULT_FACE_OPACITY: 70,
+            MIN_FONT_SIZE: 0, MAX_FONT_SIZE: 100, DEFAULT_FONT_SIZE: 50,
+            MIN_PANEL_OPACITY: 0, MAX_PANEL_OPACITY: 100, DEFAULT_PANEL_OPACITY: 95,
+            DICE_FACES_COUNT: 12,
+            DICE_MIN_ROTATION_SPEED: 0.01, DICE_MAX_ROTATION_SPEED: 0.2,
+            DICE_DAMPING_FACTOR: 0.95, DICE_STOP_THRESHOLD: 0.001,
+            MIN_LIGHT_INTENSITY: 0.2, MAX_LIGHT_INTENSITY: 1.0, DEFAULT_LIGHT_INTENSITY: 0.8,
+            MIN_TEXT_SIZE: 12, MAX_TEXT_SIZE: 72, DEFAULT_TEXT_SIZE: 50, TEXT_SIZE_MULTIPLIER: 0.72,
+        };
+
+        // 简化的对象创建函数
+        const createObject = {
+            face: () => ({ center: { x: 0, y: 0, z: 0 }, nodes: [] }),
+            node: () => ({ x: 0, y: 0, z: 0 }),
+            vector: () => ({ x: 0, y: 0, z: 0 }),
+            faceData: () => ({ center: { x: 0, y: 0, z: 0 }, projectedNodes: [], color: '', index: 0 })
+        };
+        
+        
+        // 通用工具类 - 重构版本
+        class Utils {
+            // 随机数工具
+            static randomArray(a) { return a[Math.floor(Math.random() * a.length)]; }
+            static randomRange(a, b) { return Math.random() * (b - a) + a; }
+            static shuffle(a) { return a.sort(() => Math.random() < 0.5 ? -1 : 1); }
+            
+            // 向量操作 - 统一接口
+            static createVector(a, b) { return { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }; }
+            static addVectors(u, v) { return { x: u.x + v.x, y: u.y + v.y, z: u.z + v.z }; }
+            static scaleVector(vector, factor) { return { x: vector.x * factor, y: vector.y * factor, z: vector.z * factor }; }
+            static norm({ x, y, z }) { return Math.sqrt(x * x + y * y + z * z); }
+            static normalizeVector(v) {
+                const len = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+                const invLen = 1 / len;
+                return { x: v.x * invLen, y: v.y * invLen, z: v.z * invLen };
+            }
+            static dotProduct(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+            static crossProduct(a, b) {
+                return {
+                    x: a.y * b.z - a.z * b.y,
+                    y: a.z * b.x - a.x * b.z,
+                    z: a.x * b.y - a.y * b.x
+                };
+            }
+            
+            // 几何操作
+            static createCenter(a, b) {
+                return {
+                    x: (b.x + a.x) / 2,
+                    y: (b.y + a.y) / 2,
+                    z: (b.z + a.z) / 2
+                };
+            }
+            static translatePoint(p, v) { return Utils.addVectors(p, v); }
+            static projectPointOnAxis(p, a, b) {
+                const ab = Utils.createVector(a, b);
+                const lambda = Utils.dotProduct(ab, Utils.createVector(a, p)) / Utils.dotProduct(ab, ab);
+                const scaledAb = Utils.scaleVector(ab, lambda);
+                return Utils.addVectors(a, scaledAb);
+            }
+            
+            // 矩阵操作
+            static multiplyMatrices(a, b) {
+                const c = [];
+                for (let i = 0; i < a.length; i++) {
+                    const row = [];
+                    for (let j = 0; j < b[0].length; j++) {
+                        let sum = 0;
+                        for (let k = 0; k < b.length; k++) {
+                            sum += a[i][k] * b[k][j];
+                        }
+                        row.push(sum);
+                    }
+                    c.push(row);
+                }
+                return c;
+            }
+            
+            // 旋转操作
+            static rotatePointAroundAxis(p, a, b, angle) {
+                const axis = Utils.normalizeVector(Utils.createVector(a, b));
+                const { x: ax, y: ay, z: az } = axis;
+                const cos = Math.cos(angle), sin = Math.sin(angle);
+                const oneMinusCos = 1 - cos;
+                
+                const px = p.x - a.x, py = p.y - a.y, pz = p.z - a.z;
+                const dot = px * ax + py * ay + pz * az;
+                const crossX = ay * pz - az * py;
+                const crossY = az * px - ax * pz;
+                const crossZ = ax * py - ay * px;
+                
+                return {
+                    x: px * cos + crossX * sin + ax * dot * oneMinusCos + a.x,
+                    y: py * cos + crossY * sin + ay * dot * oneMinusCos + a.y,
+                    z: pz * cos + crossZ * sin + az * dot * oneMinusCos + a.z
+                };
+            }
+            
+            // 样式工具 - 统一处理样式设置
+            static setElementStyle(element, styles) {
+                if (!element) return;
+                if (typeof styles === 'string') {
+                    element.style.cssText = styles;
+                } else {
+                    for (const [key, value] of Object.entries(styles)) {
+                        element.style[key] = value;
+                    }
+                }
+            }
+            
+            // 事件工具 - 统一事件处理
+            static addEventListeners(element, events) {
+                if (!element) return;
+                events.forEach(([event, handler, options]) => {
+                    element.addEventListener(event, handler, options);
+                });
+            }
+            
+            // 动画工具 - 统一动画处理
+            static animate(callback) {
+                return requestAnimationFrame(callback);
+            }
+        }
+        
+        // 为了向后兼容，保留MathUtils别名
+        const MathUtils = Utils;
+
+        // 多面体创建函数
+        function createPolyhedron(nSides, dihedralAngle, name) {
+            let faces = [createPolygonNodes(nSides, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })];
+            const centers = [{ x: 0, y: 0, z: 0 }];
+            
+            const queue = [
+                {
+                    center: { x: 0, y: 0, z: 0 },
+                    nodes: faces[0],
+                },
+            ];
+            
+            while (true) {
+                if (!queue.length) break;
+                
+                const { center, nodes } = queue.shift();
+                
+                for (let i = 0; i < nSides; i++) {
+                    const a = nodes[i];
+                    const b = nodes[i === nSides - 1 ? 0 : i + 1];
+                    
+                    const pivot = MathUtils.createCenter(a, b);
+                    const p = MathUtils.createVector(center, pivot);
+                    const nextCenter = MathUtils.translatePoint(pivot, p);
+                    const rotatedCenter = MathUtils.rotatePointAroundAxis(nextCenter, a, b, PI - dihedralAngle);
+                    
+                    if (centers.every(o => MathUtils.norm(MathUtils.createVector(o, rotatedCenter)) > 0.01)) {
+                        const normalVector = MathUtils.crossProduct(p, MathUtils.createVector(a, b));
+                        const polygonNodes = createPolygonNodes(nSides, nextCenter, normalVector, a)
+                            .map(node => {
+                                const rotated = MathUtils.rotatePointAroundAxis(node, a, b, PI - dihedralAngle);
+                                return { x: rotated.x, y: rotated.y, z: rotated.z };
+                            });
+                        
+                        faces.push(polygonNodes);
+                        centers.push(rotatedCenter);
+                        
+                        queue.push({
+                            center: rotatedCenter,
+                            nodes: polygonNodes,
+                        });
+                    }
+                    
+
+                }
+            }
+            
+            const centersVector = centers.reduce((accumulator, node) => MathUtils.addVectors(accumulator, node), { x: 0, y: 0, z: 0 });
+            const polyhedronCenterTranslation = MathUtils.scaleVector(centersVector, -1 / centers.length);
+            
+            const resultFaces = faces.map((nodes, i) => {
+                const translatedCenter = MathUtils.translatePoint(centers[i], polyhedronCenterTranslation);
+                const translatedNodes = nodes.map(node => MathUtils.translatePoint(node, polyhedronCenterTranslation));
+                
+                return {
+                    center: translatedCenter,
+                    nodes: translatedNodes
+                };
+            });
+            
+            resultFaces.name = name;
+            
+            return resultFaces;
+        }
+
+        function createPolygonNodes(nSides, origin, normalVector, firstNode) {
+            const angle = TAU / nSides;
+            const distanceFromCenter = sqrt(1 / 2 / (1 - cos(angle)));
+            
+            let firstNodeToUse;
+            if (firstNode) {
+                firstNodeToUse = { x: firstNode.x, y: firstNode.y, z: firstNode.z };
+            } else {
+                firstNodeToUse = { x: distanceFromCenter + origin.x, y: origin.y, z: origin.z };
+            }
+            
+            const nodes = [firstNodeToUse];
+            
+            for (let i = 1; i < nSides; i++) {
+                const rotatedNode = MathUtils.rotatePointAroundAxis(
+                    nodes[i - 1],
+                    origin,
+                    MathUtils.addVectors(origin, normalVector),
+                    angle
+                );
+                nodes.push({ x: rotatedNode.x, y: rotatedNode.y, z: rotatedNode.z });
+            }
+            
+            return nodes;
+        }
+
+        // 创建多面体实例
+        function createPolyhedronInstance(patron) {
+            const scaleFactor = 100;
+            const params = MathUtils.shuffle([0, MathUtils.randomRange(0, TAU), MathUtils.randomRange(0, TAU)]);
+            const dParams = MathUtils.shuffle([0, MathUtils.randomRange(0, PI / 512), MathUtils.randomRange(0, PI / 512)]);
+            
+            const instance = {
+                faces: patron.map(({ center, nodes }) => {
+                    const scaledNodes = nodes.map(node => {
+                    const scaled = MathUtils.scaleVector(node, scaleFactor);
+                    return { x: scaled.x, y: scaled.y, z: scaled.z };
+                });
+                
+                const scaledCenter = MathUtils.scaleVector(center, scaleFactor);
+                const newCenter = { x: scaledCenter.x, y: scaledCenter.y, z: scaledCenter.z };
+                    
+                    return {
+                        center: newCenter,
+                        nodes: scaledNodes,
+                        normal: renderer.calculateFaceNormal(scaledNodes)
+                    };
+                }),
+                scaleFactor,
+                a: params[0],
+                b: params[1],
+                c: params[2],
+                da: dParams[0],
+                db: dParams[1],
+                dc: dParams[2],
+                x: 0,
+                y: 0,
+                dx: 0,
+                dy: 0,
+            };
+            
+            calculateOppositeFacesAndDiceMapping(instance);
+            return instance;
+        }
+
+
+
+        // 计算对面和骰子数字映射
+        function calculateOppositeFacesAndDiceMapping(instance) {
+            const centers = instance.faces.map(face => face.center);
+            const oppositeMap = new Array(centers.length).fill(-1);
+            
+            // 计算对面
+            for (let i = 0; i < centers.length; i++) {
+                if (oppositeMap[i] !== -1) continue; // 已经配对
+                
+                let maxDist = 0;
+                let oppositeIndex = -1;
+                
+                // 找到最远的对面
+                for (let j = 0; j < centers.length; j++) {
+                    if (i === j) continue;
+                    
+                    const dx = centers[j].x - centers[i].x;
+                    const dy = centers[j].y - centers[i].y;
+                    const dz = centers[j].z - centers[i].z;
+                    const dist = dx*dx + dy*dy + dz*dz;
+                    
+                    if (dist > maxDist) {
+                        maxDist = dist;
+                        oppositeIndex = j;
+                    }
+                }
+                
+                if (oppositeIndex !== -1) {
+                    oppositeMap[i] = oppositeIndex;
+                    oppositeMap[oppositeIndex] = i;
+                }
+            }
+            
+            // 创建骰子数字映射（确保对面和为13）
+            const diceMapping = new Array(centers.length).fill(0);
+            let number = 1;
+            
+            for (let i = 0; i < centers.length; i++) {
+                if (diceMapping[i] !== 0) continue; // 已分配
+                
+                const oppositeIndex = oppositeMap[i];
+                if (oppositeIndex === -1) {
+                    diceMapping[i] = number++;
+                } else {
+                    diceMapping[i] = number;
+                    diceMapping[oppositeIndex] = 13 - number;
+                    number++;
+                }
+            }
+            
+            instance.oppositeMap = oppositeMap;
+            instance.diceMapping = diceMapping;
+        }
+
+        // 渲染系统 - 重构版本，合并RenderState和Renderer
+        class RenderSystem {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.width = canvas.width;
+                this.height = canvas.height;
+                
+                // 合并的状态管理
+                this.state = {
+                    backgroundColor: '#000000',
+                    verticeColor: 'white',
+                    originalFaces: null,
+                    colorIntensity: 70,
+                    faceOpacity: 70,
+                    fontSize: 50,
+                    modelSize: 100,
+                    rotationSpeed: 50,
+                    isDiceMode: false,
+                    isPaused: false,
+                    isAnimating: false,
+                    isRolling: false,
+                    isDragging: false,
+                    lastX: 0,
+                    lastY: 0
+                };
+            }
+            
+            // 更新状态值
+            updateState(property, value) {
+                if (this.state.hasOwnProperty(property)) {
+                    this.state[property] = value;
+                }
+            }
+            
+            // 批量更新状态
+            updateStates(states) {
+                Object.assign(this.state, states);
+            }
+            
+            // 主绘制方法
+            draw(polyhedrons) {
+                this.clearCanvas();
+                
+                const { verticeColor } = this.state;
+                const polyhedronCount = polyhedrons.length;
+                
+                for (let i = 0; i < polyhedronCount; i++) {
+                    const polyhedron = polyhedrons[i];
+                    this.ctx.strokeStyle = verticeColor;
+                    
+                    const sortedFaces = this.sortFacesByDepth(polyhedron);
+                    const faceCount = sortedFaces.length;
+                    
+                    for (let j = 0; j < faceCount; j++) {
+                        this.drawFace(polyhedron, sortedFaces[j]);
+                    }
+                }
+            }
+            
+            // 清除画布
+            clearCanvas() {
+                const ctx = this.ctx;
+                ctx.fillStyle = this.state.backgroundColor;
+                ctx.fillRect(0, 0, this.width, this.height);
+            }
+            
+            // 按深度排序面
+            sortFacesByDepth(polyhedron) {
+                const { faces } = polyhedron;
+                const { colorIntensity } = this.state;
+                const faceCount = faces.length;
+                const sortedFaces = new Array(faceCount);
+                
+                for (let i = 0; i < faceCount; i++) {
+                    const face = faces[i];
+                    const { nodes, center } = face;
+                    const nodeCount = nodes.length;
+                    
+                    const projectedNodes = new Array(nodeCount);
+                    for (let j = 0; j < nodeCount; j++) {
+                        const rotated = this.applyRotations(nodes[j], polyhedron);
+                        projectedNodes[j] = { x: rotated.x, y: rotated.y, z: rotated.z };
+                    }
+                    
+                    const rotatedCenter = this.applyRotations(center, polyhedron);
+                    sortedFaces[i] = {
+                        center: { x: rotatedCenter.x, y: rotatedCenter.y, z: rotatedCenter.z },
+                        projectedNodes,
+                        color: `hsl(${(i * 30) % 360},${colorIntensity}%,75%)`,
+                        index: i
+                    };
+                }
+                
+                sortedFaces.sort((a, b) => b.center.z - a.center.z);
+                return sortedFaces;
+            }
+            
+            // 绘制单个面
+            drawFace(polyhedron, faceData) {
+                const { projectedNodes, color, index } = faceData;
+                const faceNormal = this.calculateFaceNormal(projectedNodes);
+                const dot = faceNormal.z;
+                const intensity = Math.max(0.4, (dot + 1) / 2);
+                
+                const adjustedColor = this.adjustColorBrightness(color, Math.max(0.5, intensity));
+                this.ctx.fillStyle = adjustedColor;
+                
+                this.drawPolygon(projectedNodes, polyhedron);
+                
+                if (this.state.fontSize > 0) {
+                    this.drawFaceNumber(polyhedron, projectedNodes, index);
+                }
+            }
+            
+            // 绘制多边形
+            drawPolygon(projectedNodes, polyhedron) {
+                const nodeCount = projectedNodes.length;
+                const offsetX = polyhedron.x;
+                const offsetY = polyhedron.y;
+                
+                this.ctx.beginPath();
+                const firstNode = projectedNodes[0];
+                this.ctx.moveTo(firstNode.x + offsetX, firstNode.y + offsetY);
+                
+                for (let i = 1; i < nodeCount; i++) {
+                    const node = projectedNodes[i];
+                    this.ctx.lineTo(node.x + offsetX, node.y + offsetY);
+                }
+                
+                this.ctx.closePath();
+                this.ctx.stroke();
+                this.ctx.fill();
+            }
+            
+            // 调整颜色亮度
+            adjustColorBrightness(color, intensity) {
+                const hslMatch = color.match(/hsl\((\d+),(\d+)%,(\d+)%\)/);
+                if (hslMatch) {
+                    const h = parseInt(hslMatch[1], 10);
+                    const s = parseInt(hslMatch[2], 10);
+                    const l = parseInt(hslMatch[3], 10);
+                    const newL = Math.max(60, Math.min(90, l * intensity));
+                    const opacity = this.state.faceOpacity * 0.01;
+                    return `hsla(${h},${s}%,${newL}%,${opacity})`;
+                }
+                
+                const opacity = this.state.faceOpacity * 0.01;
+                return color.replace('hsl(', 'hsla(').replace(')', `,${opacity})`);
+            }
+            
+            // 绘制面编号
+            drawFaceNumber(polyhedron, projectedNodes, index) {
+                const { x: px, y: py } = polyhedron;
+                const { modelSize, fontSize: baseFontSize, isDiceMode } = this.state;
+                const nodeCount = projectedNodes.length;
+                
+                let sumX = 0, sumY = 0;
+                for (let i = 0; i < nodeCount; i++) {
+                    const { x, y } = projectedNodes[i];
+                    sumX += x;
+                    sumY += y;
+                }
+                
+                const centerX = sumX / nodeCount + px;
+                const centerY = sumY / nodeCount + py;
+                
+                const scale = (modelSize || 100) / 100;
+                const fontSize = Math.max(12, Math.min(Math.max(60, baseFontSize * 1.5), baseFontSize * scale));
+                
+                const displayNumber = isDiceMode ? 
+                    this.getDiceFaceNumber(index) : 
+                    index + 1;
+                
+                const ctx = this.ctx;
+                ctx.fillStyle = 'white';
+                ctx.font = `${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(displayNumber.toString(), centerX, centerY);
+            }
+            
+            // 计算面的法向量
+            calculateFaceNormal(nodes) {
+                const nodeCount = nodes.length;
+                if (nodeCount < 3) return { x: 0, y: 0, z: 1 };
+                
+                const p0 = nodes[0];
+                const p1 = nodes[1];
+                const p2 = nodes[2];
+                
+                const v1x = p1.x - p0.x;
+                const v1y = p1.y - p0.y;
+                const v1z = p1.z - p0.z;
+                
+                const v2x = p2.x - p0.x;
+                const v2y = p2.y - p0.y;
+                const v2z = p2.z - p0.z;
+                
+                const nx = v1y * v2z - v1z * v2y;
+                const ny = v1z * v2x - v1x * v2z;
+                const nz = v1x * v2y - v1y * v2x;
+                
+                const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+                if (length === 0) return { x: 0, y: 0, z: 1 };
+                
+                const invLength = 1 / length;
+                return {
+                    x: nx * invLength,
+                    y: ny * invLength,
+                    z: nz * invLength
+                };
+            }
+            
+            // 获取骰子面编号
+            getDiceFaceNumber(index) {
+                if (polyhedrons && polyhedrons.length > 0 && polyhedrons[0].diceMapping) {
+                    return polyhedrons[0].diceMapping[index];
+                }
+                return index + 1;
+            }
+            
+            // 获取骰子面映射信息
+            getDiceMappingInfo() {
+                if (polyhedrons && polyhedrons.length > 0 && polyhedrons[0].diceMapping) {
+                    return polyhedrons[0].diceMapping.map((num, index) => 
+                        `面${index}显示数字${num}`
+                    );
+                }
+                return [];
+            }
+            
+            // 应用旋转
+            applyRotations({ x, y, z }, { a, b, c }) {
+                const ca = cos(a), sa = sin(a);
+                const cb = cos(b), sb = sin(b);
+                const cc = cos(c), sc = sin(c);
+                
+                const x1 = x, y1 = y * ca - z * sa, z1 = y * sa + z * ca;
+                const x2 = x1 * cb + z1 * sb, y2 = y1, z2 = -x1 * sb + z1 * cb;
+                
+                return {
+                    x: x2 * cc - y2 * sc,
+                    y: x2 * sc + y2 * cc,
+                    z: z2
+                };
+            }
+        }
+        
+        // 向后兼容的别名
+        const RenderState = RenderSystem;
+        const Renderer = RenderSystem;
+
+        // 动画控制器 - 优化版本
+        class AnimationController {
+            constructor(renderer, state) {
+                this.renderer = renderer;
+                this.state = state;
+                this.polyhedrons = [];
+                // 预定义常量
+                this.PHYSICS = {
+                    twoPI: 2 * PI,
+                    randomRange: 0.0001,
+                    gravity: 9.8,
+                    deltaTime: 0.016,
+                    minSpeed: 0.002
+                };
+            }
+
+            // 更新逻辑 - 简化版本
+            update() {
+                const { isDiceMode, isAnimating, isDragging, isPaused } = this.state;
+                
+                if (isDiceMode && isAnimating) {
+                    this.updateDiceAnimation();
+                } else if (!isDragging && !isDiceMode && !isPaused) {
+                    this.updateNormalRotation();
+                }
+            }
+            
+            // 骰子动画更新
+            updateDiceAnimation() {
+                const { twoPI, randomRange, gravity, deltaTime, minSpeed } = this.PHYSICS;
+                let allStopped = true;
+                
+                this.polyhedrons.forEach(polyhedron => {
+                    const wasMoving = this.updatePolyhedronPhysics(polyhedron, gravity, deltaTime, randomRange, minSpeed);
+                    if (wasMoving) allStopped = false;
+                    
+                    // 应用旋转并规范化角度
+                    polyhedron.a = (polyhedron.a + (polyhedron.da || 0)) % twoPI;
+                    polyhedron.b = (polyhedron.b + (polyhedron.db || 0)) % twoPI;
+                    polyhedron.c = (polyhedron.c + (polyhedron.dc || 0)) % twoPI;
+                });
+                
+                if (allStopped && this.state.isAnimating) {
+                    this.stopDiceAnimation();
+                }
+            }
+            
+            // 更新单个多面体物理状态
+            updatePolyhedronPhysics(polyhedron, gravity, deltaTime, randomRange, minSpeed) {
+                if (polyhedron.isDecelerating) {
+                    const currentSpeed = Math.sqrt(polyhedron.da ** 2 + polyhedron.db ** 2 + polyhedron.dc ** 2);
+                    
+                    if (currentSpeed > minSpeed) {
+                        // 简化的物理计算
+                        const resistance = (polyhedron.airResistance * currentSpeed ** 2 + polyhedron.friction * polyhedron.mass * gravity) / polyhedron.mass;
+                        const reductionFactor = Math.max(0.95, 1 - Math.min(resistance * deltaTime, currentSpeed) / currentSpeed);
+                        
+                        // 批量应用减速和随机扰动
+                        const randomOffset = () => (Math.random() - 0.5) * randomRange;
+                        polyhedron.da = polyhedron.da * reductionFactor + randomOffset();
+                        polyhedron.db = polyhedron.db * reductionFactor + randomOffset();
+                        polyhedron.dc = polyhedron.dc * reductionFactor + randomOffset();
+                        
+                        return true;
+                    } else {
+                        // 停止运动
+                        polyhedron.da = polyhedron.db = polyhedron.dc = 0;
+                        polyhedron.isDecelerating = false;
+                        return false;
+                    }
+                }
+                return Math.abs(polyhedron.da) >= minSpeed || Math.abs(polyhedron.db) >= minSpeed || Math.abs(polyhedron.dc) >= minSpeed;
+            }
+            
+            // 停止骰子动画
+            stopDiceAnimation() {
+                this.state.isAnimating = false;
+                renderState.state.isAnimating = false;
+                if (domElements.rollDiceButton) {
+                    domElements.rollDiceButton.textContent = '掷骰子';
+                }
+                calculateDiceResult();
+            }
+            
+            // 普通旋转更新
+            updateNormalRotation() {
+                const rotationSpeed = Math.pow(this.state.rotationSpeed / 100, 2) * 0.03;
+                const sizeValue = this.state.modelSize;
+                
+                this.polyhedrons.forEach(polyhedron => {
+                    this.updatePolyhedronRotation(polyhedron, rotationSpeed);
+                    polyhedron.scaleFactor = sizeValue;
+                });
+            }
+            
+
+
+
+
+            // 更新单个多面体的旋转 - 优化版本
+            updatePolyhedronRotation(polyhedron, rotationSpeed) {
+                const goldenRatio = CONFIG.GOLDEN_RATIO;
+                const time = Date.now() * 0.001;
+                
+                // 简化的旋转计算，合并相似操作
+                polyhedron.b += rotationSpeed;
+                const bFactor = polyhedron.b * 0.005;
+                
+                // 批量计算所有旋转分量
+                polyhedron.a += rotationSpeed * (Math.sin(bFactor) * 0.6 * goldenRatio + Math.sin(time * 0.1) * 0.1);
+                polyhedron.c += rotationSpeed * (Math.cos(bFactor * 1.4) * 0.4 * PI + Math.cos(time * 0.15) * 0.08);
+                
+                // 规范化角度
+                polyhedron.a %= TAU;
+                polyhedron.b %= TAU;
+                polyhedron.c %= TAU;
+            }
+        }
+
+        // 全局变量
+        const patrons = [
+            createPolyhedron(5, 2 * atan((1 + sqrt(5)) / 2), 'dodecahedron'),
+        ];
+
+        let polyhedrons = [];
+        let originalFaces = null;
+        let canvas = null;
+        let renderer = null;
+        let animationController = null;
+        let renderState = null;
+        let renderSystem = null;
+        
+        // DOM元素缓存
+        let domElements = {};
+        
+        // DOM元素获取工具函数
+        const getElementById = (id) => document.getElementById(id);
+        
+        // 初始化函数 - 优化版本
+        function init() {
+            // 初始化DOM元素缓存 - 优化版本
+            const elementMappings = {
+                rotationSpeed: 'rotationSpeedModal', speedValue: 'speedValueModal',
+                modelSize: 'modelSizeModal', sizeValue: 'sizeValueModal',
+                colorIntensity: 'colorIntensityModal', colorValue: 'colorValueModal',
+                faceOpacity: 'faceOpacityModal', opacityValue: 'opacityValueModal',
+                fontSize: 'fontSizeModal', fontSizeValue: 'fontSizeValueModal',
+                panelOpacity: 'panelOpacityModal', panelOpacityValue: 'panelOpacityValueModal',
+                diceModeButton: 'diceModeButton', rollDiceContainer: 'rollDiceContainer',
+                rollDiceButton: 'rollDiceButton', loader: 'loader', blurToggle: 'blurToggle',
+                controlPanel: 'controlPanel', canvas: 'dodecahedronCanvas'
+            };
+            
+            domElements = Object.fromEntries(
+                Object.entries(elementMappings).map(([key, id]) => [key, getElementById(id)])
+            );
+
+            // 初始化画布
+            canvas = domElements.canvas;
+            canvas.width = 800;
+            canvas.height = 600;
+            
+            if (!canvas) {
+                console.error("Canvas element not found!");
+                return;
+            }
+            
+            // 创建渲染系统
+            renderSystem = new RenderSystem(canvas);
+            
+            // 为了向后兼容，保留旧的引用
+            renderState = { state: renderSystem.state };
+            renderer = renderSystem;
+            
+            // 创建动画控制器
+            animationController = new AnimationController(renderer, renderSystem.state);
+            
+            // 创建多面体实例
+            polyhedrons = patrons.map(createPolyhedronInstance);
+            
+            // 将多面体实例传递给动画控制器并设置初始位置
+            animationController.polyhedrons = polyhedrons;
+            polyhedrons.forEach(p => {
+                p.x = canvas.width / 2;
+                p.y = canvas.height / 2;
+            });
+            
+            // 存储原始面数据
+            if (polyhedrons.length > 0) {
+                originalFaces = polyhedrons[0].faces.map(face => ({
+                    ...face,
+                    nodes: face.nodes.map(node => ({ ...node }))
+                }));
+            }
+            
+            // 添加鼠标事件
+            addMouseEvents();
+            
+            // 添加键盘事件
+            addKeyboardEvents();
+            
+            // 添加控件事件
+            addControlEvents();
+            
+            // 初始化显示值并同步滑块状态 - 优化版本
+            const syncSliderValues = () => {
+                const sliderMappings = {
+                    rotationSpeed: 'rotationSpeed',
+                    modelSize: 'modelSize',
+                    colorIntensity: 'colorIntensity',
+                    faceOpacity: 'faceOpacity',
+                    fontSize: 'fontSize'
+                };
+                
+                Object.entries(sliderMappings).forEach(([elementKey, stateKey]) => {
+                    const element = domElements[elementKey];
+                    if (element && renderState.state[stateKey] !== undefined) {
+                        element.value = renderState.state[stateKey];
+                    }
+                });
+            };
+            
+            syncSliderValues();
+            updateDisplayValues();
+            
+            // 更新面板透明度和毛玻璃效果 - 优化版本
+            const updatePanelAppearance = () => {
+                const panelOpacitySlider = document.getElementById('panelOpacityModal');
+                const blurToggle = domElements.blurToggle;
+                const controlPanel = document.querySelector('.control-panel');
+                const controlGroups = document.querySelectorAll('.control-group');
+
+                if (!panelOpacitySlider || !blurToggle || !controlPanel) return;
+
+                const panelOpacity = Number(panelOpacitySlider.value);
+                const isBlurEnabled = blurToggle.checked;
+                const opacity = panelOpacity / 100;
+                const blur = isBlurEnabled ? 'blur(20px)' : 'none';
+
+                // 预定义样式对象
+                const panelStyles = {
+                    transparent: {
+                        background: 'transparent',
+                        backdropFilter: 'none',
+                        webkitBackdropFilter: 'none',
+                        boxShadow: 'none',
+                        border: 'none'
+                    },
+                    normal: {
+                        background: `rgba(0, 0, 0, ${opacity})`,
+                        backdropFilter: blur,
+                        webkitBackdropFilter: blur,
+                        boxShadow: '0 10px 60px rgba(0, 0, 0, 0.7)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }
+                };
+                
+                const groupStyles = {
+                    transparent: {
+                        background: 'transparent',
+                        border: 'none',
+                        boxShadow: 'none'
+                    },
+                    normal: {
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'none'
+                    }
+                };
+
+                // 选择样式并应用
+                const styleKey = (panelOpacity <= 0 && !isBlurEnabled) ? 'transparent' : 'normal';
+                
+                Utils.setElementStyle(controlPanel, {
+                    background: panelStyles[styleKey].background,
+                    backdropFilter: panelStyles[styleKey].backdropFilter,
+                    webkitBackdropFilter: panelStyles[styleKey].webkitBackdropFilter,
+                    boxShadow: panelStyles[styleKey].boxShadow,
+                    border: panelStyles[styleKey].border
+                });
+                
+                controlGroups.forEach(group => {
+                    Utils.setElementStyle(group, {
+                        background: groupStyles[styleKey].background,
+                        border: groupStyles[styleKey].border,
+                        boxShadow: groupStyles[styleKey].boxShadow
+                    });
+                });
+            };
+
+            // 为所有滑块和开关添加事件处理
+            const setupControlListeners = () => {
+                const eventManager = new EventManager();
+                // 添加updateModelSize函数到setupControlListeners的作用域
+                const updateModelSize = size => {
+                    if (!originalFaces) return;
+                    polyhedrons[0].faces = originalFaces.map(f => ({...f, nodes: f.nodes.map(n => ({x:n.x*size/100, y:n.y*size/100, z:n.z*size/100}))}));
+                };
+                
+                const sliders = document.querySelectorAll('input[type="range"]');
+                sliders.forEach(slider => {
+                    const valueDisplay = slider.parentElement.querySelector('.value-display');
+                    
+                    const updateDisplay = () => {
+                        if (valueDisplay) {
+                            valueDisplay.textContent = slider.value;
+                        }
+                        // 任何滑块或开关变动都应更新面板外观
+                        updatePanelAppearance();
+                    };
+
+                    const handleSliderChange = (value) => {
+                        const sliderId = slider.id;
+                        const intValue = parseInt(value);
+                        
+                        // 简化状态更新
+                        const stateMap = {
+                            'rotationSpeedModal': 'rotationSpeed',
+                            'colorIntensityModal': 'colorIntensity',
+                            'faceOpacityModal': 'faceOpacity',
+                            'fontSizeModal': 'fontSize'
+                        };
+                        
+                        if (stateMap[sliderId]) {
+                            renderState.state[stateMap[sliderId]] = intValue;
+                        } else if (sliderId === 'modelSizeModal') {
+                            renderState.state.modelSize = intValue;
+                            updateModelSize(intValue);
+                        }
+                        
+                        updateDisplay();
+                        
+                        // 立即重绘模型以反映变化
+                        if (renderer && polyhedrons) {
+                            renderer.draw(polyhedrons);
+                        }
+                    };
+
+                    // 移动端优化的事件处理
+                    const handleSliderTouch = (e) => {
+                        // 阻止事件冒泡，防止面板滑动
+                        e.stopPropagation();
+                        
+                        // 获取触摸位置
+                        const touch = e.touches[0];
+                        const rect = slider.getBoundingClientRect();
+                        
+                        // 计算相对位置（0-1之间）
+                        let relativeX = (touch.clientX - rect.left) / rect.width;
+                        relativeX = Math.max(0, Math.min(1, relativeX));
+                        
+                        // 计算新值
+                        const min = parseFloat(slider.min) || 0;
+                        const max = parseFloat(slider.max) || 100;
+                        const newValue = Math.round(min + relativeX * (max - min));
+                        
+                        // 更新滑块值
+                        slider.value = newValue;
+                        handleSliderChange(newValue);
+                    };
+                    
+                    // 移动端专用触摸事件 - 使用EventManager优化
+                    let isDraggingSlider = false;
+                    
+                    // 统一的触摸事件处理函数
+                    const handleTouchEvent = (e, eventType) => {
+                        switch(eventType) {
+                            case 'touchstart':
+                                isDraggingSlider = true;
+                                slider.classList.add('dragging');
+                                handleSliderTouch(e);
+                                if (e.cancelable) e.preventDefault();
+                                break;
+                            case 'touchmove':
+                                if (!isDraggingSlider) return;
+                                handleSliderTouch(e);
+                                if (e.cancelable) e.preventDefault();
+                                break;
+                            case 'touchend':
+                                isDraggingSlider = false;
+                                slider.classList.remove('dragging');
+                                e.stopPropagation();
+                                break;
+                            case 'touchcancel':
+                                isDraggingSlider = false;
+                                slider.classList.remove('dragging');
+                                break;
+                        }
+                    };
+                    
+                    // 使用EventManager批量添加触摸事件监听器
+                    const touchEventHandlers = [
+                        [slider, 'touchstart', (e) => handleTouchEvent(e, 'touchstart')],
+                        [slider, 'touchmove', (e) => handleTouchEvent(e, 'touchmove')],
+                        [slider, 'touchend', (e) => handleTouchEvent(e, 'touchend')],
+                        [slider, 'touchcancel', (e) => handleTouchEvent(e, 'touchcancel')]
+                    ];
+                    
+                    eventManager.addEventListeners(touchEventHandlers, { passive: false });
+                    
+                    // 使用EventManager管理input事件用于鼠标操作
+                    eventManager.addEventListeners([
+                        [slider, 'input', (e) => {
+                            handleSliderChange(e.target.value);
+                        }]
+                    ]);
+                });
+
+                const blurToggle = document.getElementById('blurToggle');
+                if (blurToggle) {
+                    // 使用EventManager管理blurToggle事件
+                    eventManager.addEventListeners([
+                        [blurToggle, 'change', function() {
+                            domElements.blurToggle = this;
+                            updatePanelAppearance();
+                        }]
+                    ]);
+                }
+            };
+
+            setupControlListeners();
+            
+            // 初始绘制
+            renderer.draw(polyhedrons);
+        }
+
+        // 添加鼠标交互事件 - 使用EventManager优化
+        function addMouseEvents() {
+            const eventManager = new EventManager();
+            const state = {
+                isDragging: false,
+                lastX: 0, lastY: 0,
+                initialDistance: 0, initialScale: 100,
+                initialAngle: 0, initialRotation: { a: 0, b: 0, c: 0 },
+                lastTap: 0
+            };
+
+            const resetModel = () => {
+                polyhedrons.forEach(p => p.a = p.b = p.c = 0);
+                renderer.draw(polyhedrons);
+            };
+
+            const updateRotation = (deltaX, deltaY) => {
+                polyhedrons[0].a += deltaY * 0.01;
+                polyhedrons[0].b += deltaX * 0.01;
+                renderer.draw(polyhedrons);
+            };
+
+            const updateScale = (scaleFactor) => {
+                const newSize = Math.max(50, Math.min(200, Math.round(state.initialScale * scaleFactor)));
+                domElements.modelSize.value = newSize;
+                domElements.sizeValue.textContent = newSize;
+                
+                if (originalFaces) {
+                    const scale = newSize / 100;
+                    polyhedrons[0].faces = originalFaces.map(face => ({
+                        ...face,
+                        nodes: face.nodes.map(node => ({
+                            x: node.x * scale,
+                            y: node.y * scale,
+                            z: node.z * scale
+                        }))
+                    }));
+                }
+                renderer.draw(polyhedrons);
+            };
+
+            // 统一的事件处理器
+            const handleStart = (clientX, clientY, touches) => {
+                state.isDragging = true;
+                [state.lastX, state.lastY] = [clientX, clientY];
+                canvas.style.cursor = 'grabbing';
+            };
+
+            const handleMove = (clientX, clientY) => {
+                if (!state.isDragging) return;
+                const [deltaX, deltaY] = [clientX - state.lastX, clientY - state.lastY];
+                updateRotation(deltaX, deltaY);
+                [state.lastX, state.lastY] = [clientX, clientY];
+            };
+
+            const handleDragEnd = () => {
+                state.isDragging = false;
+                canvas.style.cursor = 'grab';
+            };
+
+            // 鼠标事件 - 使用EventManager
+            const mouseEventHandlers = [
+                [canvas, 'mousedown', (e) => {
+                    handleStart(e.clientX, e.clientY);
+                    if (e.cancelable) e.preventDefault();
+                }],
+                [canvas, 'mousemove', (e) => handleMove(e.clientX, e.clientY)],
+                [canvas, 'dblclick', resetModel],
+                [canvas, 'mouseup', handleDragEnd],
+                [canvas, 'mouseleave', handleDragEnd]
+            ];
+            
+            eventManager.addEventListeners(mouseEventHandlers, { passive: false });
+
+            // 触摸事件 - 使用EventManager
+            const getTouchDistance = (touches) => Math.hypot(
+                touches[1].clientX - touches[0].clientX,
+                touches[1].clientY - touches[0].clientY
+            );
+
+            const getTouchCenter = (touches) => ({
+                x: Array.from(touches).reduce((sum, t) => sum + t.clientX, 0) / touches.length,
+                y: Array.from(touches).reduce((sum, t) => sum + t.clientY, 0) / touches.length
+            });
+
+            const handleTouchStart = (e) => {
+                if (e.cancelable) e.preventDefault();
+                const touches = e.touches;
+                
+                if (touches.length === 1) {
+                    handleStart(touches[0].clientX, touches[0].clientY);
+                } else if (touches.length === 2) {
+                    state.initialDistance = getTouchDistance(touches);
+                    state.initialScale = parseInt(domElements.modelSize.value);
+                } else if (touches.length === 3) {
+                    const center = getTouchCenter(touches);
+                    state.initialAngle = Math.atan2(touches[0].clientY - center.y, touches[0].clientX - center.x);
+                    state.initialRotation = { a: polyhedrons[0].a, b: polyhedrons[0].b, c: polyhedrons[0].c };
+                }
+            };
+
+            const handleTouchMove = (e) => {
+                if (e.cancelable) e.preventDefault();
+                const touches = e.touches;
+                
+                if (touches.length === 1 && state.isDragging) {
+                    handleMove(touches[0].clientX, touches[0].clientY);
+                } else if (touches.length === 2) {
+                    updateScale(getTouchDistance(touches) / state.initialDistance);
+                } else if (touches.length === 3) {
+                    const center = getTouchCenter(touches);
+                    const currentAngle = Math.atan2(touches[0].clientY - center.y, touches[0].clientX - center.x);
+                    const angleDelta = currentAngle - state.initialAngle;
+                    polyhedrons[0].a = state.initialRotation.a + angleDelta * 2;
+                    polyhedrons[0].b = state.initialRotation.b + angleDelta * 1.5;
+                    renderer.draw(polyhedrons);
+                }
+            };
+
+            const handleTouchEnd = (e) => {
+                if (e.cancelable) e.preventDefault();
+                if (e.touches.length === 0) state.isDragging = false;
+                
+                const currentTime = Date.now();
+                if (currentTime - state.lastTap < 300) resetModel();
+                state.lastTap = currentTime;
+            };
+
+            const handleTouchCancel = (e) => {
+                if (e.cancelable) e.preventDefault();
+                state.isDragging = false;
+            };
+
+            // 使用EventManager添加触摸事件
+            const touchEventHandlers = [
+                [canvas, 'touchstart', handleTouchStart],
+                [canvas, 'touchmove', handleTouchMove],
+                [canvas, 'touchend', handleTouchEnd],
+                [canvas, 'touchcancel', handleTouchCancel]
+            ];
+            
+            eventManager.addEventListeners(touchEventHandlers, { passive: false });
+        }
+
+        // 添加键盘事件 - 使用EventManager优化
+        function addKeyboardEvents() {
+            const eventManager = new EventManager();
+            
+            // 键盘事件处理器配置
+            const keyboardHandlers = {
+                'Space': () => {
+                    renderState.state.isPaused = !renderState.state.isPaused;
+                },
+                'KeyR': () => {
+                    polyhedrons.forEach(p => p.a = p.b = p.c = 0);
+                    renderer.draw(polyhedrons);
+                }
+            };
+            
+            const handleKeyDown = (e) => {
+                const handler = keyboardHandlers[e.code];
+                if (handler) {
+                    handler();
+                    if (e.cancelable) e.preventDefault();
+                }
+            };
+            
+            // 使用EventManager添加键盘事件
+            window.addEventListener('load', () => {
+                document.body.focus();
+                eventManager.addEventListeners([[document, 'keydown', handleKeyDown]], { passive: false });
+            });
+            
+            // 移动端轻触暂停/播放 - 优化版本
+            const touchConfig = {
+                maxTime: 300,
+                maxDistance: 20,
+                minTouches: 1
+            };
+            
+            let touchStart = null;
+            
+            const handleTouchStart = (e) => {
+                if (e.touches.length === touchConfig.minTouches) {
+                    touchStart = {
+                        time: Date.now(), 
+                        x: e.touches[0].clientX, 
+                        y: e.touches[0].clientY
+                    };
+                }
+            };
+            
+            const handleTouchEnd = (e) => {
+                if (e.changedTouches.length === touchConfig.minTouches && touchStart) {
+                    const [x, y] = [e.changedTouches[0].clientX, e.changedTouches[0].clientY];
+                    const distance = Math.hypot(x - touchStart.x, y - touchStart.y);
+                    const timeDiff = Date.now() - touchStart.time;
+                    
+                    if (timeDiff < touchConfig.maxTime && distance < touchConfig.maxDistance) {
+                        renderState.state.isPaused = !renderState.state.isPaused;
+                    }
+                }
+            };
+            
+            // 使用EventManager添加触摸事件
+            const touchEvents = [
+                [canvas, 'touchstart', handleTouchStart],
+                [canvas, 'touchend', handleTouchEnd]
+            ];
+            
+            eventManager.addEventListeners(touchEvents);
+        }
+
+        // 添加控件事件 - 使用EventManager优化
+        function addControlEvents() {
+            const eventManager = new EventManager();
+            
+            // 移除旧的滑块触摸事件，已在setupControlListeners中重新实现
+            
+            // 骰子模式按钮事件处理
+            const handleDiceModeClick = function() {
+                // 切换骰子模式状态
+                renderState.state.isDiceMode = !renderState.state.isDiceMode;
+                
+                // 更新按钮文本和样式
+                if (renderState.state.isDiceMode) {
+                    this.textContent = '退出骰子模式';
+                    document.body.classList.add('dice-mode');
+                    domElements.rollDiceContainer.style.display = 'block';
+                    
+                    // 添加进入骰子模式的过渡效果
+                    document.body.style.transition = 'background 0.5s ease';
+                    document.body.style.backgroundColor = '#1a1a1a';
+                } else {
+                    this.textContent = '骰子模式';
+                    document.body.classList.remove('dice-mode');
+                    domElements.rollDiceContainer.style.display = 'none';
+                    renderState.state.isAnimating = false;
+                    
+                    // 恢复默认背景
+                    document.body.style.backgroundColor = '#000000';
+                }
+                
+                // 强制重绘以应用新的样式
+                renderer.draw(polyhedrons);
+            };
+            
+            // 使用EventManager添加骰子模式按钮事件
+            eventManager.addEventListeners([[domElements.diceModeButton, 'click', handleDiceModeClick]]);
+            
+            
+
+            
+            
+            
+            // 完整的掷骰子实现
+            const handleRollDiceClick = function() {
+                if (!renderState.state.isDiceMode) return;
+                
+                // 切换按钮文字
+                if (this.textContent === '掷骰子') {
+                    this.textContent = '停止';
+                    renderState.state.isAnimating = true;
+                    renderState.state.isRolling = true;
+                    
+                    // 球面均匀分布速度生成函数
+                    function generateUniformSphericalVelocity(maxSpeed = 0.4) {
+                        // 使用球面坐标系实现均匀分布
+                        const theta = Math.random() * 2 * Math.PI; // 0-2π
+                        const phi = Math.acos(2 * Math.random() - 1); // 0-π，均匀分布
+                        
+                        // 将球面坐标转换为笛卡尔坐标
+                        const r = maxSpeed * (0.3 + Math.random() * 0.7); // 速度大小在范围内
+                        const x = r * Math.sin(phi) * Math.cos(theta);
+                        const y = r * Math.sin(phi) * Math.sin(theta);
+                        const z = r * Math.cos(phi);
+                        
+                        return { da: x, db: y, dc: z };
+                    }
+
+                    // 重置所有减速状态并重新开始快速随机旋转
+                    polyhedrons.forEach(polyhedron => {
+                        // 清除减速状态
+                        polyhedron.isDecelerating = false;
+                        
+                        // 使用球面均匀分布生成初始速度
+                        const velocity = generateUniformSphericalVelocity();
+                        polyhedron.da = velocity.da;
+                        polyhedron.db = velocity.db;
+                        polyhedron.dc = velocity.dc;
+                        
+                        // 存储初始速度用于物理减速计算
+                        polyhedron.initialSpeed = {
+                            da: velocity.da,
+                            db: velocity.db,
+                            dc: velocity.dc
+                        };
+                        
+                        // 改进的物理减速参数
+                        polyhedron.decelerationFactor = 0.985; // 更平滑的减速
+                        polyhedron.minSpeed = 0.002; // 稍高的停止阈值
+                        polyhedron.friction = 0.15; // 摩擦系数
+                        polyhedron.mass = 1.0; // 质量（用于物理计算）
+                        polyhedron.airResistance = 0.02; // 空气阻力
+                    });
+                    
+                } else {
+                    this.textContent = '掷骰子';
+                    renderState.state.isRolling = false;
+                    
+                    // 开始减速过程
+                    polyhedrons.forEach(polyhedron => {
+                        // 设置减速标志，让动画控制器处理减速
+                        polyhedron.isDecelerating = true;
+                    });
+                }
+            };
+            
+            // 使用EventManager添加掷骰子按钮事件
+            eventManager.addEventListeners([[domElements.rollDiceButton, 'click', handleRollDiceClick]]);
+            
+            // 触摸设备上的滚轮事件处理
+            const handleWheel = function(e) {
+                if (e.target.tagName === 'INPUT' && e.target.type === 'range') {
+                    e.preventDefault();
+                }
+            };
+            
+            // 使用EventManager添加滚轮事件
+            eventManager.addEventListeners([[document, 'wheel', handleWheel]], { passive: false });
+        }
+
+        // 计算骰子结果
+        function calculateDiceResult() {
+            if (!polyhedrons || polyhedrons.length === 0) return;
+            
+            const results = [];
+            polyhedrons.forEach((polyhedron, index) => {
+                // 找到最正对用户的面
+                const bestFaceIndex = findBestVisibleFace(polyhedron);
+                const diceNumber = renderer.getDiceFaceNumber(bestFaceIndex);
+                results.push({
+                    diceIndex: index + 1,
+                    faceIndex: bestFaceIndex,
+                    number: diceNumber
+                });
+            });
+            
+            // 显示结果
+            displayDiceResults(results);
+            
+            // 改进的微调逻辑：等待骰子完全稳定后再进行微调 - 优化版本
+            const stabilityConfig = {
+                maxAttempts: 10,
+                checkInterval: 200, // 每200ms检查一次
+                speedThreshold: 0.0001 // 更严格的稳定阈值
+            };
+            
+            let stabilizationAttempts = 0;
+            let lastCheckTime = 0;
+            
+            const checkStability = (timestamp) => {
+                if (timestamp - lastCheckTime >= stabilityConfig.checkInterval) {
+                    stabilizationAttempts++;
+                    lastCheckTime = timestamp;
+                    
+                    // 检查所有骰子是否真的稳定了（速度接近零且没有明显变化）
+                    const isStable = polyhedrons.every(polyhedron => {
+                        const { da, db, dc } = polyhedron;
+                        const speed = Math.sqrt(da * da + db * db + dc * dc);
+                        return speed < stabilityConfig.speedThreshold;
+                    });
+                    
+                    if (isStable || stabilizationAttempts >= stabilityConfig.maxAttempts) {
+                        // 骰子已稳定或达到最大尝试次数
+                        return;
+                    }
+                }
+                
+                // 继续等待稳定 - 使用requestAnimationFrame提高性能
+                requestAnimationFrame(checkStability);
+            };
+            
+            // 开始稳定检查
+            requestAnimationFrame(checkStability);
+        }
+
+        // 找到最正对用户的面 - 使用面中心点Z坐标方法（优化版）
+        function findBestVisibleFace(polyhedron) {
+            let minZ = Infinity;
+            let bestFaceIndex = 0;
+            
+            // 缓存applyRotations函数引用，减少属性查找
+            const applyRotations = renderer.applyRotations.bind(renderer);
+            
+            // 使用for循环替代reduce，性能更好
+            for (let i = 0; i < polyhedron.faces.length; i++) {
+                const face = polyhedron.faces[i];
+                const rotatedCenter = applyRotations(face.center, polyhedron);
+                
+                if (rotatedCenter.z < minZ) {
+                    minZ = rotatedCenter.z;
+                    bestFaceIndex = i;
+                }
+            }
+            
+            return bestFaceIndex;
+        }
+
+
+        
+        // 显示骰子结果 - 优化版本
+        function displayDiceResults(results) {
+            // 缓存样式配置，避免重复创建对象
+            const cachedStyles = (() => {
+                const containerStyle = 'position:fixed;top:20px;right:20px;background:rgba(0,0,0,0.8);color:white;padding:15px;border-radius:10px;font-family:Arial,sans-serif;font-size:18px;z-index:1000;border:1px solid rgba(76,175,80,0.7);box-shadow:0 0 20px rgba(76,175,80,0.3)';
+                const titleStyle = 'font-weight:bold;margin-bottom:5px';
+                const hintStyle = 'font-size:12px;margin-top:5px;opacity:0.8';
+                return { containerStyle, titleStyle, hintStyle };
+            })();
+            
+            // 创建或更新结果显示区域
+            let resultsDiv = document.getElementById('diceResults');
+            if (!resultsDiv) {
+                resultsDiv = document.createElement('div');
+                resultsDiv.id = 'diceResults';
+                resultsDiv.style.cssText = cachedStyles.containerStyle;
+                document.body.appendChild(resultsDiv);
+            }
+            
+            // 计算结果文本
+            const total = results.reduce((sum, result) => sum + result.number, 0);
+            const resultText = results.length === 1 
+                ? `骰子结果: ${results[0].number}`
+                : `骰子结果: ${results.map(r => r.number).join(' + ')} = ${total}`;
+            
+            // 使用innerHTML一次性设置内容，减少DOM操作
+            resultsDiv.innerHTML = `
+                <div style="${cachedStyles.titleStyle}">🎲 掷骰子结果</div>
+                <div>${resultText}</div>
+                <div style="${cachedStyles.hintStyle}">点击任意位置关闭</div>
+            `;
+            
+            // 添加关闭功能 - 优化版本
+            setTimeout(() => {
+                const closeHandler = (e) => {
+                    // 避免点击结果区域时关闭
+                    if (resultsDiv.contains(e.target)) return;
+                    
+                    if (resultsDiv.parentNode) {
+                        resultsDiv.parentNode.removeChild(resultsDiv);
+                    }
+                    document.removeEventListener('click', closeHandler);
+                };
+                document.addEventListener('click', closeHandler);
+            }, 100);
+        }
+
+        // 更新显示值 - 优化版本
+        function updateDisplayValues() {
+            const updates = {
+                speedValue: domElements.rotationSpeed,
+                sizeValue: domElements.modelSize,
+                colorValue: domElements.colorIntensity,
+                opacityValue: domElements.faceOpacity,
+                fontSizeValue: domElements.fontSize
+            };
+            
+            Object.entries(updates).forEach(([displayKey, input]) => {
+                const display = domElements[displayKey];
+                if (display && input) display.textContent = input.value;
+            });
+        }
+
+        // 动画循环 - 优化版本
+        function startAnimationLoop() {
+            // 缓存常用的函数和状态引用，提高性能
+            const state = renderState.state;
+            const updateAnimation = animationController.update.bind(animationController);
+            const drawScene = renderer.draw.bind(renderer);
+            
+            function step(timestamp) {
+                // 在骰子模式下，即使暂停状态为true，也要继续动画（骰子旋转）
+                if (!state.isPaused || state.isDiceMode) {
+                    updateAnimation();
+                    drawScene(polyhedrons);
+                }
+                requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        // 通用事件管理器 - 统一事件处理模式
+        class EventManager {
+            constructor() {
+                this.eventListeners = new Map();
+            }
+            
+            // 批量添加事件监听器
+            addEventListeners(elements, options = {}) {
+                const defaultOptions = { passive: true, capture: false };
+                const mergedOptions = { ...defaultOptions, ...options };
+                
+                elements.forEach(([element, event, handler]) => {
+                    if (element) {
+                        element.addEventListener(event, handler, mergedOptions);
+                        this.eventListeners.set(element, { event, handler, options: mergedOptions });
+                    }
+                });
+            }
+            
+            // 移除事件监听器
+            removeEventListeners(elements) {
+                elements.forEach(([element, event, handler]) => {
+                    if (element) {
+                        element.removeEventListener(event, handler);
+                        this.eventListeners.delete(element);
+                    }
+                });
+            }
+            
+            // 清理所有事件监听器
+            cleanup() {
+                this.eventListeners.forEach(({ event, handler, options }, element) => {
+                    element.removeEventListener(event, handler, options);
+                });
+                this.eventListeners.clear();
+            }
+        }
+        
+        // 统一控制面板功能
+        function setupControls() {
+            const eventManager = new EventManager();
+            const controlsToggle = document.getElementById('controlsToggle');
+            const controlsOverlay = document.getElementById('controlsOverlay');
+            const controlPanel = document.getElementById('controlPanel');
+            const closePanel = document.getElementById('closePanel');
+            
+            // 显示/隐藏控制面板
+            function toggleControlPanel(show) {
+                const isVisible = show === undefined ? !document.body.classList.contains('controls-visible') : show;
+                document.body.classList.toggle('controls-visible', isVisible);
+            }
+            
+            // 控制面板事件处理 - 使用事件管理器
+            const controlElements = [
+                [controlsToggle, 'click', () => toggleControlPanel()],
+                [controlsOverlay, 'click', () => toggleControlPanel(false)],
+                [closePanel, 'click', () => toggleControlPanel(false)]
+            ];
+            
+            eventManager.addEventListeners(controlElements);
+            
+            // 移动端滑动关闭功能 - 优化版本
+            let startY = 0;
+            let isPanelDrag = false;
+            let hasSliderInteraction = false;
+            
+            const resetPanelState = () => {
+                hasSliderInteraction = false;
+                isPanelDrag = false;
+                controlPanel.style.transition = '';
+                controlPanel.style.transform = 'translate(-50%, -50%)';
+            };
+            
+            const isSliderTarget = (target) => target.type === 'range' || target.closest('.slider-container');
+            
+            if (controlPanel) {
+                // 合并事件处理逻辑
+                const handleTouchStart = (e) => {
+                    if (isSliderTarget(e.target)) {
+                        hasSliderInteraction = true;
+                        return;
+                    }
+                    
+                    hasSliderInteraction = false;
+                    isPanelDrag = true;
+                    startY = e.touches[0].clientY;
+                    controlPanel.style.transition = 'none';
+                };
+                
+                const handleTouchMove = (e) => {
+                    if (hasSliderInteraction || !isPanelDrag) return;
+                    
+                    const deltaY = e.touches[0].clientY - startY;
+                    if (deltaY > 0) {
+                        controlPanel.style.transform = `translate(-50%, calc(-50% + ${Math.min(deltaY, 100)}px))`;
+                        if (deltaY > 100) {
+                            toggleControlPanel(false);
+                            resetPanelState();
+                        }
+                    }
+                };
+                
+                const handleTouchEnd = () => {
+                    if (hasSliderInteraction) {
+                        hasSliderInteraction = false;
+                        return;
+                    }
+                    if (isPanelDrag) resetPanelState();
+                };
+                
+                // 使用事件管理器处理触摸事件
+                const touchEvents = [
+                    [controlPanel, 'touchstart', handleTouchStart],
+                    [controlPanel, 'touchmove', handleTouchMove],
+                    [controlPanel, 'touchend', handleTouchEnd],
+                    [controlPanel, 'touchcancel', resetPanelState]
+                ];
+                
+                eventManager.addEventListeners(touchEvents, { passive: true });
+            }
+            
+
+        
+        // 统一的事件处理函数 - 进一步优化版本
+        const handleSliderUpdate = (() => {
+            // 缓存重绘函数，避免重复创建
+            const redrawFrame = () => renderer.draw(polyhedrons);
+            
+            return (slider, valueDisplay, stateKey, callback) => {
+                if (!slider) return;
+                
+                const updateValue = (value) => {
+                    const intValue = parseInt(value);
+                    
+                    // 批量更新操作 - 使用对象结构
+                    const updates = {
+                        display: valueDisplay ? intValue + (valueDisplay.dataset.suffix || '') : null,
+                        state: stateKey && renderState.state[stateKey] !== undefined ? intValue : null,
+                        callback: callback ? intValue : null
+                    };
+                    
+                    // 应用更新
+                    if (updates.display !== null) valueDisplay.textContent = updates.display;
+                    if (updates.state !== null) renderState.state[stateKey] = updates.state;
+                    if (updates.callback !== null) callback(updates.callback);
+                    
+                    // 延迟重绘 - 使用缓存的函数
+                    requestAnimationFrame(redrawFrame);
+                };
+                
+                // 使用事件委托优化
+                slider.addEventListener('input', (e) => updateValue(e.target.value));
+            };
+        })();
+            
+            // 面板透明度更新 - 优化版本
+            const updatePanelOpacity = (opacity) => {
+                if (!controlPanel) return;
+                
+                const opacityValue = opacity / 100;
+                const isBlurEnabled = domElements.blurToggle?.checked ?? true;
+                const blurEffect = isBlurEnabled ? 'blur(20px)' : 'none';
+                
+                // 预计算样式字符串
+                const styles = opacity === 0 
+                    ? 'background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;border:none'
+                    : `background:rgba(0,0,0,${Math.min(0.95, opacityValue)});backdrop-filter:${blurEffect};-webkit-backdrop-filter:${blurEffect};box-shadow:0 10px 60px rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.1)`;
+                
+                Utils.setElementStyle(controlPanel, styles);
+            };
+            
+            // 初始化所有滑块
+            const sliders = [
+                [domElements.panelOpacity, domElements.panelOpacityValue, null, updatePanelOpacity],
+                [domElements.colorIntensity, domElements.colorValue, 'colorIntensity'],
+                [domElements.faceOpacity, domElements.opacityValue, 'faceOpacity'],
+                [domElements.modelSize, domElements.sizeValue, 'modelSize', (size) => {
+                    if (originalFaces) {
+                        polyhedrons[0].faces = originalFaces.map(face => ({
+                            ...face,
+                            nodes: face.nodes.map(node => ({
+                                x: node.x * size / 100,
+                                y: node.y * size / 100,
+                                z: node.z * size / 100
+                            }))
+                        }));
+                    }
+                }],
+                [domElements.fontSize, domElements.fontValue, 'fontSize'],
+                [domElements.rotationSpeed, domElements.speedValue, 'rotationSpeed']
+            ];
+            
+            sliders.forEach(args => handleSliderUpdate(...args));
+            
+            // 毛玻璃开关和初始化透明度
+            if (domElements.blurToggle) {
+                domElements.blurToggle.addEventListener('change', () => 
+                    updatePanelOpacity(parseInt(domElements.panelOpacity.value))
+                );
+            }
+            updatePanelOpacity(parseInt(domElements.panelOpacity.value));
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // 批量初始化
+            init();
+            setupControls();
+            
+            // 启动动画循环
+            startAnimationLoop();
+            
+            // 骰子模式下确保控制面板按钮可见
+            const { isDiceMode } = renderState?.state || {};
+            if (isDiceMode) {
+                document.querySelector('.controls-toggle')?.style.setProperty('display', 'inline-flex');
+            }
+        });
+    </script>
+    
+    <style>
+        /* 移动端优化样式 - 优化版本 */
+        @media (max-width: 768px) {
+            .control-panel {
+                width: 90%;
+                max-width: 400px;
+                height: auto;
+                max-height: 85vh;
+                border-radius: 16px;
+                margin: 0;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                transition: transform 0.3s ease-out;
+                will-change: transform;
+            }
+            
+            .controls-overlay { display: none; }
+            .controls-visible .controls-overlay { display: block; }
+            
+            .control-group {
+                padding: 10px;
+                margin: 4px 0;
+            }
+            
+            .slider-container {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 4px;
+                position: relative;
+                padding: 6px 0;
+            }
+            
+            .value-display {
+                min-width: 35px;
+                font-size: 13px;
+                align-self: flex-end;
+            }
+            
+            input[type="range"] {
+                width: 100%;
+                margin: 2px 0;
+                -webkit-tap-highlight-color: transparent;
+                transition: transform 0.1s ease;
+                height: 44px;
+                cursor: pointer;
+            }
+            
+            input[type="range"]:active,
+            input[type="range"].dragging {
+                transform: scale(1.02);
+            }
+            
+            input[type="range"]::-webkit-slider-thumb:active,
+            input[type="range"]::-moz-range-thumb:active {
+                transform: scale(1.2);
+                box-shadow: 0 0 15px rgba(74, 144, 226, 0.5);
+            }
+            
+            input[type="range"]::-webkit-slider-thumb,
+            input[type="range"]::-moz-range-thumb {
+                height: 28px;
+                width: 28px;
+            }
+            
+            .control-panel * {
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+            }
+        }
+        
+        /* 超小屏幕优化 - 继承基础样式 */
+        @media (max-width: 375px) {
+            .control-panel { padding: 12px; }
+            .control-group { 
+                padding: 8px; 
+                margin: 2px 0; 
+            }
+            .slider-container { 
+                gap: 3px; 
+                padding: 4px 0; 
+            }
+        }
+    </style>
+</body>
+</html>
